@@ -296,10 +296,6 @@ def train_model(X_train, y_train):
     rf_grid = GridSearchCV(rf, rf_params, cv=3, scoring='neg_mean_squared_error', n_jobs=-1)  # Moglo je i neg_mean_absolute_error, uobičajeno se koristi MSE
     rf_grid.fit(X_train, y_train)                                                           # Ovde se desava unakrsna validacija i pronalaze najbolji parametri
 
-    trained_models['RandomForest_Opt'] = {
-        'model': rf_grid.best_estimator_, 
-        'params': rf_grid.best_params_
-    }
     print(f"Najbolji RF parametri: {rf_grid.best_params_}")
 
     # Grid Search optimizacija za Gradient Boosting
@@ -325,7 +321,7 @@ def train_model(X_train, y_train):
         }
     }
 
-    print(f"Najbolji GB parametri: {gb_grid.best_params_}")
+    print(f"Najbolji GB parametri: {rf_grid.best_params_}")
 
     return trained_models
 
@@ -407,15 +403,10 @@ def feature_selection_comparison(trained_models, feature_importance, X_train, X_
     results = {}
 
     for n_features in feature_counts:
-        if n_features >= len(X_train.columns):
-            X_train_sel = X_train
-            X_test_sel = X_test
-            label = f"Svi ({len(X_train.columns)})"
-        else:
-            top_features = feature_importance.head(n_features)['feature'].tolist()
-            X_train_sel = X_train[top_features]
-            X_test_sel = X_test[top_features]
-            label = f"Top {n_features}"
+        top_features = feature_importance.head(n_features)['feature'].tolist()
+        X_train_sel = X_train[top_features]
+        X_test_sel = X_test[top_features]
+        label = f"Top {n_features}"
 
         # Treniraj model sa selektovanim features
         model = RandomForestRegressor(**best_params, random_state=42, n_jobs=-1)
@@ -482,7 +473,7 @@ def main():
         # Pripremi podatke
         X_train, X_test, y_train, y_test = prepare_data(df)
 
-        # 7. Treniraj modele
+        # Treniraj modele
         trained_models = train_model(X_train, y_train)
 
         # Evaluacija najboljih modela

@@ -16,49 +16,49 @@ warnings.filterwarnings('ignore')
 
 def load_dataset():
     """
-    Učitava dataset iz hour.csv fajla.
+    Loads dataset from hour.csv.
     Returns:
-        DataFrame: Učitani dataset
+        DataFrame: Loaded dataset
     """
-    print(" Učitavanje dataseta...")
+    print(" Loading dataset...")
     try:
         df = pd.read_csv('hour.csv')
         if 'dteday' in df.columns:
             df['dteday'] = pd.to_datetime(df['dteday'])
-        print(f"Dataset učitan: hour.csv")
-        print(f"Dimenzije: {df.shape}")
-        print(f"Nedostajuće vrednosti: {df.isnull().sum().sum()}")
+        print(f"Dataset loaded: hour.csv")
+        print(f"Dimensions: {df.shape}")
+        print(f"Missing values: {df.isnull().sum().sum()}")
         return df
     except FileNotFoundError:
-        print("Greška: hour.csv fajl nije pronađen!")
-        print("Molim stavite hour.csv fajl u isti folder kao program.")
+        print("Error: hour.csv file not found!")
+        print("Please place hour.csv in the same directory as this script.")
         return None
     except Exception as e:
-        print(f"Greška pri učitavanju: {e}")
+        print(f"Error loading data: {e}")
         return None
 
 def clean_data(df):
     """
-    Čisti podatke - uklanja nepotrebne kolone, proverava anomalije i popunjava missing values.
+    Cleans data by dropping unnecessary columns, handling outliers, and filling missing values.
     Args:
-        df: DataFrame sa podacima
+        df: Input DataFrame
     Returns:
-        DataFrame: Očišćeni dataset
+        DataFrame: Cleaned dataset
     """
-    print(" Čišćenje podataka...")
+    print(" Cleaning data...")
 
-    # Ukloni nepotrebne kolone
+    # Drop unnecessary columns
     columns_to_drop = ['instant', 'casual', 'registered']
     for col in columns_to_drop:
         if col in df.columns:
             df.drop(col, axis=1, inplace=True)
-            print(f"Uklonjena kolona: {col}")
+            print(f"Dropped column: {col}")
 
     if 'cnt' not in df.columns:
-        print("Greška: Kolona 'cnt' nije pronađena u datasetu!")
+        print("Error: 'cnt' column not found in dataset!")
         return None
 
-    # Obrada anomalija (clip umesto uklanjanja)
+    # Handle outliers using clipping instead of removal
     continuous_cols = ['temp', 'atemp', 'hum', 'windspeed', 'cnt']
     for col in continuous_cols:
         if col in df.columns:
@@ -71,9 +71,9 @@ def clean_data(df):
                 outliers_before = len(df[(df[col] < lower_bound) | (df[col] > upper_bound)])
                 df[col] = df[col].clip(lower_bound, upper_bound)
                 if outliers_before > 0:
-                    print(f"Clip-ovano {outliers_before} outliers u koloni {col}")
+                    print(f"Clipped {outliers_before} outliers in column {col}")
 
-    # Popuni missing values
+    # Fill missing values
     numeric_means = df.select_dtypes(include=[np.number]).mean()
     df[numeric_means.index] = df[numeric_means.index].fillna(numeric_means)
 
@@ -81,202 +81,197 @@ def clean_data(df):
 
 def exploratory_data_analysis(df):
     """
-    Izvodi eksplorativnu analizu skupa podataka.
+    Performs exploratory data analysis on the dataset.
     Args:
-        df: DataFrame sa podacima
+        df: Input DataFrame
     """
-    print(" Eksplorativna analiza...")
+    print(" Running exploratory data analysis...")
 
-    # Korelaciona analiza
+    # Correlation analysis
     numeric_df = df.select_dtypes(include=[np.number])
     correlations = numeric_df.corr()['cnt'].abs().sort_values(ascending=False)
-    print("Top 5 korelacija sa 'cnt':")
+    print("Top 5 correlations with 'cnt':")
     for feature, corr in correlations.head(6).items():
         if feature != 'cnt':
             print(f"  {feature}: {corr:.3f}")
 
-    # Osnovna statistika
-    print(f"Prosečna potražnja: {df['cnt'].mean():.0f} bicikala")
+    # Summary statistics
+    print(f"Average demand: {df['cnt'].mean():.0f} bikes")
     if 'hr' in df.columns:
         peak_hour = df.groupby('hr')['cnt'].mean().idxmax()
         print(f"Peak hour: {peak_hour}:00")
 
-    # Sezonska analiza
+    # Seasonal analysis
     if 'season' in df.columns:
         seasonal_stats = df.groupby('season')['cnt'].mean()
-        print("Prosečna potražnja po sezonama:")
-        season_names = {1: 'Proleće', 2: 'Leto', 3: 'Jesen', 4: 'Zima'}
+        print("Average demand by season:")
+        season_names = {1: 'Spring', 2: 'Summer', 3: 'Fall', 4: 'Winter'}
         for season, avg in seasonal_stats.items():
-            print(f"  {season_names.get(season, season)}: {avg:.0f} bicikala")
+            print(f"  {season_names.get(season, season)}: {avg:.0f} bikes")
 
-    # Vizuelizacije
+    # Visualizations
     try:
-        # Korelaciona matrica
+        # Correlation matrix heatmap
         plt.figure(figsize=(16, 6))
         plt.subplot(1, 2, 1)
         mask = np.triu(np.ones_like(numeric_df.corr(), dtype=bool))
         sns.heatmap(numeric_df.corr(), mask=mask, annot=True, cmap='coolwarm', center=0, 
-                   fmt='.2f', annot_kws={'size': 10}, square=True, linewidths=0.5)
-        plt.title('Korelaciona matrica', fontsize=16, fontweight='bold')
+                    fmt='.2f', annot_kws={'size': 10}, square=True, linewidths=0.5)
+        plt.title('Correlation Matrix', fontsize=16, fontweight='bold')
         plt.xticks(fontsize=11, rotation=45, ha='right')
         plt.yticks(fontsize=11, rotation=0)
 
-        # Boxplot - povećan i čitljiviji
+        # Boxplot for outlier detection
         plt.subplot(1, 2, 2)
         available_cols = [col for col in ['temp', 'hum', 'windspeed', 'cnt'] if col in df.columns]
         df[available_cols].boxplot(figsize=(8, 6), fontsize=11)
-        plt.title('Boxplot za detekciju outliera', fontsize=16, fontweight='bold')
-        plt.ylabel('Vrednost', fontsize=12)
-        plt.xlabel('Promenljive', fontsize=12)
+        plt.title('Boxplot for Outlier Detection', fontsize=16, fontweight='bold')
+        plt.ylabel('Value', fontsize=12)
+        plt.xlabel('Variables', fontsize=12)
         plt.xticks(fontsize=11, rotation=0)
         plt.yticks(fontsize=10)
 
         plt.tight_layout()
-        plt.savefig('korelacija_i_anomalije.png', dpi=300, bbox_inches='tight')
+        plt.savefig('correlation_and_outliers.png', dpi=300, bbox_inches='tight')
         plt.close()
-        print("Vizuelizacije sačuvane u 'korelacija_i_anomalije.png'")
+        print("Visualizations saved to 'correlation_and_outliers.png'")
     except Exception as e:
-        print(f"Greška pri kreiranju vizuelizacija: {e}")
+        print(f"Error creating visualizations: {e}")
 
 def feature_engineering(df):
     """
-    Kreira nove karakteristike (features) iz postojećih podataka.
+    Generates new features from existing dataset variables.
     Args:
-        df: DataFrame sa podacima
+        df: Input DataFrame
     Returns:
-        DataFrame: Dataset sa novim karakteristikama
+        DataFrame: Dataset with newly engineered features
     """
-    print(" Kreiranje novih karakteristika...")
+    print(" Engineering features...")
 
-    # Ciklične transformacije za sat
+    # Cyclic transformations for hour
     if 'hr' in df.columns:
         df['hr_sin'] = np.sin(2 * np.pi * df['hr'] / 24)
         df['hr_cos'] = np.cos(2 * np.pi * df['hr'] / 24)
-        print("Dodato: hr_sin, hr_cos")
+        print("Added: hr_sin, hr_cos")
 
-    # Ciklične transformacije za mesec
+    # Cyclic transformations for month
     if 'mnth' in df.columns:
         df['mnth_sin'] = np.sin(2 * np.pi * (df['mnth'] - 1) / 12)
         df['mnth_cos'] = np.cos(2 * np.pi * (df['mnth'] - 1) / 12)
-        print("Dodato: mnth_sin, mnth_cos")
+        print("Added: mnth_sin, mnth_cos")
 
-    # Rush hour
+    # Rush hour indicator
     if 'hr' in df.columns:
         df['rush_hour'] = ((df['hr'].between(7, 9)) | (df['hr'].between(17, 19))).astype(int)
-        print("Dodato: rush_hour")
+        print("Added: rush_hour")
 
-    # Temperature kategorije
+    # Temperature categorization
     if 'temp' in df.columns:
         df['temp_category'] = pd.cut(df['temp'], bins=[0, 0.3, 0.7, 1.0], labels=[0, 1, 2], include_lowest=True).astype(int)
-        print("Dodato: temp_category")
+        print("Added: temp_category")
 
     return df
 
 def encode_categorical(df):
     """
-    Enkodira kategorijalne varijable koristeći OneHotEncoder.
+    Encodes categorical features using OneHotEncoder.
     Args:
-        df: DataFrame sa podacima
+        df: Input DataFrame
     Returns:
-        DataFrame: Enkodirani dataset
+        DataFrame: Encoded dataset
     """
-    print(" Enkodiranje kategorijalnih varijabli...")
+    print(" Encoding categorical variables...")
 
     categorical_cols = ['season', 'weathersit', 'weekday']
-    available_categorical = [col for col in categorical_cols if col in df.columns]  # Provera da li kolone postoje
+    available_categorical = [col for col in categorical_cols if col in df.columns]
 
     if available_categorical:
         try:
-            encoder = OneHotEncoder(drop='first', sparse_output=False)  # sparse_output=False vraća obican NumPy array umesto matrice
+            encoder = OneHotEncoder(drop='first', sparse_output=False)  # Returns a standard dense numpy array
             encoded_cols = encoder.fit_transform(df[available_categorical])
             encoded_df = pd.DataFrame(encoded_cols, 
-                                    columns=encoder.get_feature_names_out(available_categorical),  # Pravi dataFrame sa imenima kolona (generisanim od strane OneHotEncoder) i ispunjava enkodirane vrednosti
-                                    index=df.index)
+                                      columns=encoder.get_feature_names_out(available_categorical),  # Maps generated feature names
+                                      index=df.index)
 
-            df = df.drop(available_categorical, axis=1) # Ukloni originalne kategorijalne kolone
-            df = pd.concat([df, encoded_df], axis=1)    # Dodaj enkodirane kolone nazad u glavni DataFrame koje popunjavaju mesta originalnih kolona
-            print(f"Dodato {encoded_cols.shape[1]} enkodiranih kolona")
+            df = df.drop(available_categorical, axis=1) # Remove original categorical columns
+            df = pd.concat([df, encoded_df], axis=1)    # Append encoded features to the main DataFrame
+            print(f"Added {encoded_cols.shape[1]} encoded columns")
         except Exception as e:
-            print(f"Greška pri enkodiranju: {e}")
+            print(f"Encoding error: {e}")
 
     return df
 
 def prepare_data(df):
     """
-    Priprema podatke za treniranje modela - TEMPORAL SPLIT.
+    Splits data chronologically to set up training and testing sets.
     Args:
-        df: DataFrame sa podacima
+        df: Input DataFrame
     Returns:
         tuple: X_train, X_test, y_train, y_test
     """
-    print(" Priprema za treniranje (temporal split)...")
+    print(" Preparing data (temporal split)...")
 
-    # Temporal split HRONOLOSKI, da buduci rezultati ne bi predvideli proslost, jer ne znamo da li je sistem zavistan od vremena ili ne, pa pretpostavljamo da jeste 
-    #  Training / Test
+    # Chronological split to prevent data leakage from future records
     # (80% train, 20% test)
-
     df = df.sort_values('dteday')
     split_idx = int(len(df) * 0.8)
-    train_df = df.iloc[:split_idx].copy()  # Nalazi granicu za 80% podataka i deli DataFrame na train i test delove na osnovu te granice
+    train_df = df.iloc[:split_idx].copy()  
     test_df = df.iloc[split_idx:].copy()
 
-    print(f"Training period: {train_df['dteday'].min()} do {train_df['dteday'].max()}")
-    print(f"Test period: {test_df['dteday'].min()} do {test_df['dteday'].max()}")
+    print(f"Training period: {train_df['dteday'].min()} to {train_df['dteday'].max()}")
+    print(f"Test period: {test_df['dteday'].min()} to {test_df['dteday'].max()}")
 
-    train_df = train_df.drop('dteday', axis=1)      # Ukloni dteday kolonu jer nije potrebna za treniranje
+    train_df = train_df.drop('dteday', axis=1)      # Remove date column since it's no longer needed
     test_df = test_df.drop('dteday', axis=1)    
-
 
     X_train = train_df.drop('cnt', axis=1)
     X_test = test_df.drop('cnt', axis=1)
     y_train = train_df['cnt']
     y_test = test_df['cnt']
 
-    # Ukloni redundantne kolone
+    # Remove redundant base columns if cyclic transformations exist
     redundant_cols = ['hr', 'mnth'] if 'hr_sin' in X_train.columns else []
     for col in redundant_cols:
         if col in X_train.columns:
             X_train = X_train.drop(col, axis=1)
             X_test = X_test.drop(col, axis=1)
-            print(f"Uklonjena redundantna '{col}' kolona")
+            print(f"Removed redundant '{col}' column")
 
-    # Popuni missing values
+    # Handle missing values
     numeric_means = X_train.select_dtypes(include=[np.number]).mean()
     X_train = X_train.fillna(numeric_means)
     X_test = X_test.fillna(numeric_means)
 
-    # Log transformacija
+    # Log transformation for skewed target values
     y_train_log = np.log1p(y_train)
     y_test_log = np.log1p(y_test)
 
-    print(f"Features: {X_train.shape[1]} kolona")
-    print(f"Training samples: {X_train.shape[0]} redova")
-    print(f"Test samples: {X_test.shape[0]} redova")
+    print(f"Features: {X_train.shape[1]} columns")
+    print(f"Training samples: {X_train.shape[0]} rows")
+    print(f"Test samples: {X_test.shape[0]} rows")
 
     return X_train, X_test, y_train_log, y_test_log
 
-# Ovde se nalazi i cross validation
+# Includes cross-validation setup
 def train_model(X_train, y_train):
     """
-    Trenira i optimizuje više modela.
+    Trains and tunes multiple regression models.
     Args:
         X_train: Training features
         y_train: Training target
     Returns:
-        dict: Istrenirani modeli i parametri
+        dict: Tuned estimators and parameters
     """
-    print(" Treniranje i optimizacija modela...")
+    print(" Training and optimizing models...")
     trained_models = {}
 
-    # Osnovno treniranje različitih algoritama. Moze postojati i npr. linear regression , ali je dodatan posao, a ocigledno je da ne moze da prismridi RFR-u, a pogotovo tek GBR-u.
-    # Istestirao sam, znam da ne valja, imao sam neke probleme sa ispisom, pa sam ga se resio.
-
+    # Baseline evaluation of tree-based ensemble algorithms
     base_models = {
         'RandomForest': RandomForestRegressor(n_estimators=50, random_state=42),
         'GradientBoosting': GradientBoostingRegressor(n_estimators=50, random_state=42)
     }
 
-    print("Osnovno testiranje algoritama:")
+    print("Baseline algorithm evaluation:")
 
     for name, model in base_models.items():
         model.fit(X_train, y_train)
@@ -284,8 +279,8 @@ def train_model(X_train, y_train):
         cv_rmse = np.sqrt(-cv_scores.mean())
         print(f"  {name}: CV RMSE = {cv_rmse:.1f}")
 
-    # Grid Search optimizacija za Random Forest
-    print("\nGrid Search optimizacija za Random Forest...")
+    # Grid Search optimization for Random Forest
+    print("\nGrid Search optimization for Random Forest...")
     rf_params = {
         'n_estimators': [50, 100],
         'max_depth': [8, 10],
@@ -293,22 +288,22 @@ def train_model(X_train, y_train):
     }
 
     rf = RandomForestRegressor(random_state=42, n_jobs=-1)
-    rf_grid = GridSearchCV(rf, rf_params, cv=3, scoring='neg_mean_squared_error', n_jobs=-1)  # Moglo je i neg_mean_absolute_error, uobičajeno se koristi MSE
-    rf_grid.fit(X_train, y_train)                                                           # Ovde se desava unakrsna validacija i pronalaze najbolji parametri
+    rf_grid = GridSearchCV(rf, rf_params, cv=3, scoring='neg_mean_squared_error', n_jobs=-1)  
+    rf_grid.fit(X_train, y_train)                                                            # Hyperparameter tuning via CV
 
-    print(f"Najbolji RF parametri: {rf_grid.best_params_}")
+    print(f"Best RF parameters: {rf_grid.best_params_}")
 
-    # Grid Search optimizacija za Gradient Boosting
-    print("Grid Search optimizacija za Gradient Boosting...")
+    # Grid Search optimization for Gradient Boosting
+    print("Grid Search optimization for Gradient Boosting...")
     gb_params = {
         'n_estimators': [50, 100],
         'max_depth': [6, 8],
         'learning_rate': [0.1, 0.05]
     }
 
-    gb = GradientBoostingRegressor(random_state=42)                                                    
-    gb_grid = GridSearchCV(gb, gb_params, cv=3, scoring='neg_mean_squared_error', n_jobs=-1)   # Moglo je i neg_mean_absolute_error, uobičajeno se koristi MSE      
-    gb_grid.fit(X_train, y_train)                                                            # Ovde se desava unakrsna validacija i pronalaze najbolji parametri
+    gb = GradientBoostingRegressor(random_state=42)                                         
+    gb_grid = GridSearchCV(gb, gb_params, cv=3, scoring='neg_mean_squared_error', n_jobs=-1)      
+    gb_grid.fit(X_train, y_train)                                                            # Hyperparameter tuning via CV
 
     trained_models = {
         'RandomForest_Opt': {
@@ -321,34 +316,34 @@ def train_model(X_train, y_train):
         }
     }
 
-    print(f"Najbolji GB parametri: {rf_grid.best_params_}")
+    print(f"Best GB parameters: {rf_grid.best_params_}")
 
     return trained_models
 
 def evaluate_model(models, X_train, X_test, y_train, y_test, model_name):
     """
-    Evaluira performanse modela.
+    Evaluates model performance metrics.
     Args:
-        models: Rečnik istreniranih modela
-        X_train, X_test: Training i test features
-        y_train, y_test: Training i test target (u log skali)
-        model_name: Naziv modela
+        models: Dictionary of trained estimators
+        X_train, X_test: Feature sets
+        y_train, y_test: Target arrays (log scale)
+        model_name: Identifier for the model
     Returns:
-        dict: Metrike performansi
+        dict: Performance metrics
     """
     model = models[model_name]['model']
 
-    # Predikcije
+    # Generate predictions
     y_pred_train = model.predict(X_train)
     y_pred_test = model.predict(X_test)
 
-    # Konvertuj nazad iz log skale
+    # Inverse transform from log scale
     y_train_orig = np.expm1(y_train)
     y_test_orig = np.expm1(y_test)
     y_pred_train_orig = np.expm1(y_pred_train)
     y_pred_test_orig = np.expm1(y_pred_test)
 
-    # Izračunaj metrike
+    # Compute evaluation metrics
     train_r2 = r2_score(y_train_orig, y_pred_train_orig)
     test_r2 = r2_score(y_test_orig, y_pred_test_orig)
     test_rmse = np.sqrt(mean_squared_error(y_test_orig, y_pred_test_orig))
@@ -366,16 +361,16 @@ def evaluate_model(models, X_train, X_test, y_train, y_test, model_name):
 
 def show_feature_importance(trained_models, feature_names):
     """
-    Prikazuje važnost karakteristika za najbolji model.
+    Extracts and displays feature importance for the selected model.
     Args:
-        trained_models: Rečnik istreniranih modela
-        feature_names: Nazivi karakteristika
+        trained_models: Dictionary of trained estimators
+        feature_names: List of column names
     Returns:
-        DataFrame: Feature importance tabela
+        DataFrame: Importance ranking table
     """
-    print("\n Analiza važnosti karakteristika...")
+    print("\n Analyzing feature importance...")
 
-    # Uzmi najbolji model
+    # Evaluate the primary optimized model
     best_model_name = list(trained_models.keys())[1]
     model = trained_models[best_model_name]['model']
 
@@ -384,7 +379,7 @@ def show_feature_importance(trained_models, feature_names):
         'importance': model.feature_importances_
     }).sort_values('importance', ascending=False)
 
-    print("Top 10 najbitnijih features:")
+    print("Top 10 most important features:")
     for _, row in feature_importance.head(10).iterrows():
         print(f"  {row['feature']}: {row['importance']:.3f}")
 
@@ -392,9 +387,9 @@ def show_feature_importance(trained_models, feature_names):
 
 def feature_selection_comparison(trained_models, feature_importance, X_train, X_test, y_train, y_test):
     """
-    Poredi performanse sa različitim brojem features.
+    Compares model performance using different subsets of top features.
     """
-    print("\n Poređenje sa različitim brojem features...")
+    print("\n Comparing performance across different feature counts...")
 
     best_model_name = list(trained_models.keys())[0]
     best_params = trained_models[best_model_name]['params']
@@ -408,12 +403,12 @@ def feature_selection_comparison(trained_models, feature_importance, X_train, X_
         X_test_sel = X_test[top_features]
         label = f"Top {n_features}"
 
-        # Treniraj model sa selektovanim features
+        # Train model using feature subsets
         model = RandomForestRegressor(**best_params, random_state=42, n_jobs=-1)
         model.fit(X_train_sel, y_train)
         y_pred = model.predict(X_test_sel)
 
-        # Konvertuj iz log skale
+        # Inverse transform from log scale
         y_test_orig = np.expm1(y_test)
         y_pred_orig = np.expm1(y_pred)
         r2 = r2_score(y_test_orig, y_pred_orig)
@@ -425,9 +420,9 @@ def feature_selection_comparison(trained_models, feature_importance, X_train, X_
 
 def show_sample_predictions(y_test, y_pred_test, n_samples=5):
     """
-    Prikazuje primere predikcija.
+    Prints comparative samples of actual vs predicted values.
     """
-    print("\n Primeri predikcija...")
+    print("\n Sample predictions...")
 
     y_test_orig = np.expm1(y_test)
     y_pred_test_orig = np.expm1(y_pred_test)
@@ -435,7 +430,7 @@ def show_sample_predictions(y_test, y_pred_test, n_samples=5):
     n_samples = min(n_samples, len(y_test))
     sample_indices = np.random.choice(len(y_test), n_samples, replace=False)
 
-    print(f"{'#':<3} {'Stvarno':<10} {'Predviđeno':<12} {'Greška'}")
+    print(f"{'#':<3} {'Actual':<10} {'Predicted':<12} {'Error'}")
     print("-" * 35)
 
     for i, idx in enumerate(sample_indices):
@@ -446,69 +441,70 @@ def show_sample_predictions(y_test, y_pred_test, n_samples=5):
 
 def main():
     """
-    Glavna funkcija programa.
+    Main execution pipeline.
     """
     print("=== BIKE SHARING DEMAND PREDICTOR ===\n")
 
     try:
-        # Učitaj dataset
+        # Load dataset
         df = load_dataset()
         if df is None:
             return None
 
-        # Očisti podatke
+        # Clean data
         df = clean_data(df)
         if df is None:
             return None
 
-        # Eksplorativna analiza
+        # Run EDA
         exploratory_data_analysis(df.copy())
 
         # Feature engineering
         df = feature_engineering(df)
 
-        # Enkodiranje
+        # Categorical encoding
         df = encode_categorical(df)
 
-        # Pripremi podatke
+        # Split and prepare data
         X_train, X_test, y_train, y_test = prepare_data(df)
 
-        # Treniraj modele
+        # Train models
         trained_models = train_model(X_train, y_train)
 
-        # Evaluacija najboljih modela
-        print("\nEvaluacija najboljih modela...")
+        # Evaluate models
+        print("\nEvaluating models...")
         results = {}
 
-        # Iterira kroz OBA modela!
+        # Loop through all available models
         for name in trained_models:
             results[name] = evaluate_model(trained_models, X_train, X_test, y_train, y_test, name)
             
-            # Analiza kvaliteta
+            # Label performance quality
             r2 = results[name]['test_r2']
             if r2 > 0.8:
-                quality = "ODLIČAN"
+                quality = "EXCELLENT"
             elif r2 > 0.7:
-                quality = "DOBAR"
+                quality = "GOOD"
             else:
-                quality = "ZADOVOLJAVAJUĆI"
+                quality = "SATISFACTORY"
 
             overfitting = results[name]['overfitting']
-            stability = "stabilan" if overfitting < 0.1 else "overfitting"
+            stability = "stable" if overfitting < 0.1 else "overfitting"
             
             print(f"{name}:")
             print(f"  Test R²: {r2:.3f} ({quality})")
             print(f"  Test RMSE: {results[name]['test_rmse']:.1f}")
             print(f"  Test MAE: {results[name]['test_mae']:.1f}")
-            print(f"  Stabilnost: {stability}")
-        # Feature importance
+            print(f"  Stability: {stability}")
+            
+        # Feature importance ranking
         feature_importance = show_feature_importance(trained_models, X_train.columns)
 
-        # Feature selection poređenje
+        # Feature selection comparison
         fs_results = feature_selection_comparison(trained_models, feature_importance, 
-                                                X_train, X_test, y_train, y_test)
+                                                 X_train, X_test, y_train, y_test)
 
-        # Primeri predikcija
+        # Generate sample predictions
         best_model_name = max(results.keys(), key=lambda k: results[k]['test_r2'])
         best_model = trained_models[best_model_name]['model']
         y_pred_test = best_model.predict(X_test)
@@ -517,20 +513,19 @@ def main():
         best_r2 = results[best_model_name]['test_r2']
         best_rmse = results[best_model_name]['test_rmse']
 
-
-        print(f"\nNajbolji model: {best_model_name}")
+        print(f"\nBest model: {best_model_name}")
         print(f"Test R²: {best_r2:.3f}")
-        print(f"Test RMSE: {best_rmse:.1f} bicikala")
+        print(f"Test RMSE: {best_rmse:.1f} bikes")
 
-        quality = "ODLIČAN" if best_r2 > 0.8 else "DOBAR" if best_r2 > 0.7 else "ZADOVOLJAVAJUĆI"
-        print(f"Kvalitet: {quality}")
+        quality = "EXCELLENT" if best_r2 > 0.8 else "GOOD" if best_r2 > 0.7 else "SATISFACTORY"
+        print(f"Performance: {quality}")
 
         print("=" * 60)
 
         return trained_models, results, feature_importance
 
     except Exception as e:
-        print(f"\nGreška u programu: {e}")
+        print(f"\nError in main execution: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -538,6 +533,6 @@ def main():
 if __name__ == "__main__":
     result = main()
     if result is not None:
-        print("\nProgram uspešno završen!")
+        print("\nProgram completed successfully!")
     else:
-        print("\nProgram nije mogao da se izvrši.")
+        print("\nProgram failed to execute.")

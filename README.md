@@ -53,10 +53,12 @@ $$IQR = Q_3 - Q_1$$
 ### 2. Feature Engineering & Cyclic Time Encoding
 
 Hours (`0-23`) and months (`1-12`) are naturally cyclical. Standard numerical mapping forces a model to interpret hour `23` and hour `0` as opposites, even though they are consecutive.
+
 To fix this, the script maps time features onto a 2D circle using sine and cosine transformations:
 
-* $\text{hr\_sin} = \sin\left(\frac{2\pi \times \text{hr}}{24}\right)$
-* $\text{hr\_cos} = \cos\left(\frac{2\pi \times \text{hr}}{24}\right)$
+$$\text{hr\_sin} = \sin\left(\frac{2\pi \times \text{hr}}{24}\right)$$
+
+$$\text{hr\_cos} = \cos\left(\frac{2\pi \times \text{hr}}{24}\right)$$
 
 Additionally, domain-specific indicators like **Rush Hour** blocks (`7-9 AM` and `5-7 PM`) and discrete **Temperature Categories** are extracted to maximize predictive power.
 
